@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>CODE QUEST — Adventure of the Coder</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:#07101f;color:#eef6ff;font-family:system-ui,Arial,sans-serif;overflow:hidden;touch-action:none}
+#wrap{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}
+canvas{display:block;background:#0a1530;image-rendering:auto}
+#menu,#quiz,#pause,#over,#win,#help{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,7,18,.82);z-index:10}
+.panel{width:min(92vw,560px);padding:24px;border:1px solid #38557d;border-radius:20px;background:#101c33;box-shadow:0 12px 50px #0008;text-align:center}
+h1{margin:0 0 4px;font-size:clamp(34px,7vw,64px);letter-spacing:2px}
+h2{margin:6px 0 18px;color:#7fe7ff}.sub{color:#9db1cc;margin-bottom:20px}
+button{border:0;border-radius:12px;padding:13px 18px;margin:6px;background:#28b7e8;color:#04111c;font-weight:800;font-size:16px;min-width:140px;cursor:pointer}
+button.secondary{background:#243753;color:#eaf5ff}button:active{transform:scale(.97)}
+#hud{position:fixed;top:10px;left:10px;right:10px;z-index:5;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.badge{background:#0c1930dd;border:1px solid #355074;border-radius:10px;padding:7px 10px;font-weight:700}
+#hint{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#0c1930e8;border:1px solid #38557d;padding:8px 14px;border-radius:10px;z-index:6;display:none}
+#touch{position:fixed;inset:0;z-index:7;display:none;pointer-events:none}
+.tbtn{position:absolute;bottom:18px;width:68px;height:68px;border-radius:18px;background:#102846cc;border:2px solid #7fe7ff;color:white;font-size:26px;font-weight:900;pointer-events:auto}
+#left{left:18px}#right{left:96px}#jump{right:20px;width:88px}#act{right:118px;width:68px}
+#portrait{display:none;position:fixed;z-index:20;inset:0;background:#07101fee;align-items:center;justify-content:center;text-align:center;padding:30px}
+#quiz .panel{text-align:left}.qcode{white-space:pre-wrap;background:#07101f;padding:12px;border-radius:10px;font-family:monospace;color:#b9f1ff}
+#answers{display:grid;grid-template-columns:1fr 1fr}.answer{width:auto;margin:5px;text-align:left}
+@media(max-width:700px){#answers{grid-template-columns:1fr}.panel{padding:18px}.badge{font-size:12px;padding:6px 8px}}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game"></canvas></div>
+<div id="hud">
+  <div class="badge" id="hp">❤️ 3/3</div><div class="badge" id="xp">⭐ XP 0</div>
+  <div class="badge" id="coin">🪙 0</div><div class="badge" id="score">🏆 0</div>
+  <div class="badge" id="level">📍 1 — CODING CITY</div>
+</div>
+<div id="hint"></div>
+<div id="touch"><button class="tbtn" id="left">◀</button><button class="tbtn" id="right">▶</button><button class="tbtn" id="act">E</button><button class="tbtn" id="jump">JUMP</button></div>
+<div id="menu"><div class="panel"><h1>CODE QUEST</h1><h2>ADVENTURE OF THE CODER</h2><div class="sub">Platformer edukasi coding original.</div><button id="play">PLAY</button><button id="how" class="secondary">HOW TO PLAY</button><button id="sound" class="secondary">🔊 SOUND ON</button><button id="music" class="secondary">🎵 MUSIC ON</button></div></div>
+<div id="help"><div class="panel"><h2>CARA BERMAIN</h2><p>Desktop: A/D atau ←/→ untuk bergerak, Space/W/↑ untuk lompat, E untuk terminal, Esc untuk pause.</p><p>Android: gunakan tombol sentuh. Dekati terminal lalu tekan E.</p><p>Jawab soal coding untuk membuka portal dan mendapatkan XP.</p><button id="back" class="secondary">KEMBALI</button></div></div>
+<div id="pause"><div class="panel"><h2>PAUSED</h2><button id="resume">RESUME</button><button id="restart" class="secondary">RESTART</button><button id="pmenu" class="secondary">MAIN MENU</button></div></div>
+<div id="quiz"><div class="panel"><h2 id="qtitle">CODING TERMINAL</h2><p id="qtext"></p><div class="qcode" id="qcode"></div><div id="answers"></div><p id="feedback"></p></div></div>
+<div id="over"><div class="panel"><h1>GAME OVER</h1><p>Jangan menyerah!</p><button id="retry">RETRY</button><button id="omenu" class="secondary">MAIN MENU</button></div></div>
+<div id="win"><div class="panel"><h1>CONGRATS!</h1><h2>CODE WORLD RESTORED</h2><p id="final"></p><button id="again">PLAY AGAIN</button><button id="wmenu" class="secondary">MAIN MENU</button></div></div>
+<div id="portrait"><div><h2>PUTAR PERANGKAT</h2><p>Gunakan mode landscape untuk pengalaman terbaik.</p></div></div>
+
+<script>
+"use strict";
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+let W=960,H=540,scale=1,keys={},touch={l:false,r:false,j:false,e:false},state="menu";
+let audioCtx=null,musicOn=true,soundOn=true,musicTimer=null;
+const levels=[
+ {name:"CODING CITY",theme:"#102d4b",ground:"#24486b",questions:[
+  ["Apa output kode berikut?","let x = 5;\\nconsole.log(x + 3);",["2","8","15","53"],1,"5 + 3 menghasilkan 8."],
+  ["Mana yang merupakan string?","",["42","true",'"Byte"',"3.14"],2,'"Byte" adalah string.']]},
+ {name:"LOGIC FOREST",theme:"#0c3329",ground:"#23634c",questions:[
+  ["Apa hasil kondisi ini?","let umur = 15;\\nif (umur >= 13) console.log('OK');",["ERROR","OK","15","umur"],1,"15 lebih besar atau sama dengan 13."],
+  ["Operator AND di JavaScript adalah...","",["||","&&","!","=="],1,"&& berarti AND."]]},
+ {name:"LOOP FACTORY",theme:"#38291b",ground:"#79562e",questions:[
+  ["Apa outputnya?","for (let i=0; i<3; i++) console.log(i);",["1 2 3","0 1 2","0 1 2 3","3"],1,"Loop dimulai dari 0 dan berhenti sebelum 3."],
+  ["i++ berarti...","",["i dikurangi 1","i dikali 2","i ditambah 1","i menjadi 0"],2,"++ menambah nilai satu."]]},
+ {name:"FUNCTION CASTLE",theme:"#2c1946",ground:"#5c3b7d",questions:[
+  ["Kata kunci untuk membuat fungsi adalah...","",["func","function","make","def"],1,"Dalam JavaScript digunakan function."],
+  ["Apa fungsi return?","",["Mengembalikan nilai","Menghapus fungsi","Mengulang kode","Membuat variabel"],0,"return mengembalikan nilai dari fungsi."]]},
+ {name:"BUG LAB",theme:"#401d28",ground:"#7d3347",questions:[
+  ["Kesalahan penulisan kode disebut...","",["syntax error","coin error","screen error","level error"],0,"Syntax error terjadi ketika aturan penulisan kode dilanggar."],
+  ["Apa tujuan debugging?","",["Mencari dan memperbaiki bug","Membuat game lebih lambat","Menghapus semua variabel","Mematikan program"],0,"Debugging adalah proses mencari dan memperbaiki masalah pada program."]]}
+];
+let level=0,world,player,enemies,coins,terminals,portal,checkpoint,cam=0,hp=3,xp=0,score=0,coinCount=0,unlocked=0,currentQ=null;
+function resize(){W=Math.min(1100,innerWidth);H=Math.min(650,innerHeight);canvas.width=W*devicePixelRatio;canvas.height=H*devicePixelRatio;canvas.style.width=W+"px";canvas.style.height=H+"px";ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);scale=W/960}
+addEventListener("resize",resize);resize();
+function tone(freq,dur=.08,type="square",vol=.04){if(!soundOn)return;if(!audioCtx)return;let o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(vol,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);o.connect(g).connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur)}
+function startAudio(){if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==="suspended")audioCtx.resume();if(!musicTimer&&musicOn){let n=0;musicTimer=setInterval(()=>{const notes=[261.63,329.63,392,523.25,392,329.63];tone(notes[n++%notes.length],.13,"triangle",.018)},240)}}
+function stopMusic(){clearInterval(musicTimer);musicTimer=null}
+function show(id,on=true){document.getElementById(id).style.display=on?"flex":"none"}
+function updateHUD(){hp.textContent=`❤️ ${hp}/3`;xpEl.textContent=`⭐ XP ${xp}`;coinEl.textContent=`🪙 ${coinCount}`;scoreEl.textContent=`🏆 ${score}`;levelEl.textContent=`📍 ${level+1} — ${levels[level].name}`}
+const hpEl=document.getElementById("hp"),xpEl=document.getElementById("xp"),coinEl=document.getElementById("coin"),scoreEl=document.getElementById("score"),levelEl=document.getElementById("level");
+function buildLevel(i){level=i;world={w:4300,ground:levels[i].ground};player={x:80,y:360,vx:0,vy:0,w:30,h:44,on:false};cam=0;checkpoint={x:80,y:360};enemies=[];coins=[];terminals=[];portal={x:4140,y:330,w:52,h:80,open:false};for(let x=160;x<4000;x+=190+Math.random()*100)coins.push({x,y:260-Math.random()*80,r:8,taken:false});for(let x=500;x<3900;x+=850)terminals.push({x,y:360,w:40,h:60,done:false});for(let x=700;x<4000;x+=650)enemies.push({x,y:405,w:34,h:28,vx:1.2,home:x});checkpoint.x=80;checkpoint.y=360;updateHUD();state="play";show("menu",false);show("over",false);show("win",false);show("pause",false);document.getElementById("touch").style.display=("ontouchstart" in window)?"block":"none"}
+function rectHit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+function platforms(){return [
+{x:0,y:440,w:4300,h:100},{x:330,y:350,w:150,h:22},{x:650,y:300,w:170,h:22},{x:970,y:370,w:150,h:22},
+{x:1250,y:290,w:170,h:22},{x:1530,y:350,w:170,h:22},{x:1840,y:270,w:180,h:22},{x:2180,y:340,w:170,h:22},
+{x:2480,y:250,w:180,h:22},{x:2820,y:330,w:170,h:22},{x:3150,y:250,w:180,h:22},{x:3500,y:350,w:180,h:22},{x:3820,y:280,w:180,h:22}
+]}
+function hurt(){hp--;tone(90,.18,"sawtooth",.07);player.x=checkpoint.x;player.y=checkpoint.y;player.vy=0;if(hp<=0){state="over";show("over")}updateHUD()}
+function interact(){if(state!=="play")return;for(const t of terminals){if(!t.done&&Math.abs(player.x-t.x)<75){openQuiz(t);return}}}
+function openQuiz(t){state="quiz";currentQ={t,q:levels[level].questions[Math.floor(Math.random()*levels[level].questions.length)]};document.getElementById("qtext").textContent=currentQ.q[0];document.getElementById("qcode").textContent=currentQ.q[1];const a=document.getElementById("answers");a.innerHTML="";currentQ.q[2].forEach((v,i)=>{let b=document.createElement("button");b.className="answer";b.textContent=String.fromCharCode(65+i)+". "+v;b.onclick=()=>answer(i);a.appendChild(b)});document.getElementById("feedback").textContent="";show("quiz")}
+function answer(i){const q=currentQ.q;if(i===q[3]){currentQ.t.done=true;xp+=100;score+=200;document.getElementById("feedback").textContent="CORRECT! "+q[4];tone(660,.08,"triangle",.06);setTimeout(()=>{show("quiz",false);state="play";checkPortal()},700)}else{document.getElementById("feedback").textContent="NOT QUITE! "+q[4];tone(120,.12,"sawtooth",.05)}updateHUD()}
+function checkPortal(){portal.open=terminals.every(t=>t.done)}
+function resetLevel(){buildLevel(level)}
+function nextLevel(){if(level<levels.length-1){buildLevel(level+1)}else{state="win";document.getElementById("final").textContent=`XP ${xp} • Score ${score} • Coins ${coinCount}`;show("win")}}
+function update(dt){if(state!=="play")return;let left=keys.ArrowLeft||keys.a||touch.l,right=keys.ArrowRight||keys.d||touch.r;if(left)player.vx-=900*dt;if(right)player.vx+=900*dt;player.vx*=Math.pow(.001,dt);player.vx=Math.max(-240,Math.min(240,player.vx));if((keys.Space||keys.w||keys.ArrowUp||touch.j)&&player.on){player.vy=-500;player.on=false;tone(420,.06,"square",.04);touch.j=false}player.vy+=1200*dt;player.x+=player.vx*dt;player.y+=player.vy*dt;player.on=false;for(const p of platforms()){if(player.x+player.w>p.x&&player.x<p.x+p.w&&player.y+player.h>=p.y&&player.y+player.h<=p.y+35&&player.vy>=0){player.y=p.y-player.h;player.vy=0;player.on=true}}if(player.x<0)player.x=0;if(player.x>world.w-player.w)player.x=world.w-player.w;if(player.y>600)hurt();for(const c of coins){if(!c.taken&&Math.hypot(player.x+15-c.x,player.y+20-c.y)<25){c.taken=true;coinCount++;score+=10;tone(800,.06,"sine",.04)}}for(const e of enemies){e.x+=e.vx;if(Math.abs(e.x-e.home)>90)e.vx*=-1;if(rectHit(player,e))hurt()}for(const t of terminals){if(rectHit(player,{x:t.x-5,y:t.y,w:50,h:70})&&keys.e){keys.e=false;openQuiz(t)}}if(Math.abs(player.x-80)<30)checkpoint={x:80,y:360};for(const t of terminals)if(t.done&&Math.abs(player.x-t.x)<35)checkpoint={x:t.x,y:300};checkPortal();if(portal.open&&rectHit(player,portal)){score+=500;nextLevel()}cam=Math.max(0,Math.min(world.w-W/scale,player.x-300));updateHUD()}
+function draw(){ctx.clearRect(0,0,W,H);ctx.save();ctx.scale(scale,scale);let sw=960,sh=540;ctx.fillStyle=levels[level].theme;ctx.fillRect(0,0,sw,sh);ctx.save();ctx.translate(-cam,0);
+for(let x=0;x<world.w;x+=220){ctx.fillStyle="#ffffff10";ctx.fillRect(x,80+(x%3)*20,100,4)}
+ctx.fillStyle="#102038";for(let x=0;x<world.w;x+=300){ctx.fillRect(x,180-(x%4)*15,100,260);ctx.fillStyle="#1c3b58";for(let w=0;w<3;w++)for(let y=0;y<4;y++)ctx.fillRect(x+15+w*28,210+y*45,14,20);ctx.fillStyle="#102038"}
+for(const p of platforms()){ctx.fillStyle=world.ground;ctx.fillRect(p.x,p.y,p.w,p.h);ctx.fillStyle="#56c8df";ctx.fillRect(p.x,p.y,p.w,5)}
+for(const c of coins)if(!c.taken){ctx.fillStyle="#ffd34d";ctx.beginPath();ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#fff0a0";ctx.stroke()}
+for(const t of terminals){ctx.fillStyle=t.done?"#36d399":"#8b5cf6";ctx.fillRect(t.x,t.y,t.w,t.h);ctx.fillStyle="#07101f";ctx.fillRect(t.x+7,t.y+8,26,20);ctx.fillStyle="#b8f7ff";ctx.font="12px monospace";ctx.fillText(">",t.x+12,t.y+23)}
+for(const e of enemies){ctx.fillStyle="#ff5470";ctx.fillRect(e.x,e.y,e.w,e.h);ctx.fillStyle="#07101f";ctx.fillRect(e.x+7,e.y+7,6,6);ctx.fillRect(e.x+21,e.y+7,6,6)}
+ctx.fillStyle=portal.open?"#7fe7ff":"#384b65";ctx.fillRect(portal.x,portal.y,portal.w,portal.h);ctx.fillStyle="#07101f";ctx.fillRect(portal.x+8,portal.y+8,portal.w-16,portal.h-16);
+ctx.fillStyle="#39d98a";ctx.fillRect(checkpoint.x-4,checkpoint.y-45,8,45);
+ctx.fillStyle="#ffd166";ctx.fillRect(player.x,player.y,player.w,player.h);ctx.fillStyle="#17213a";ctx.fillRect(player.x+5,player.y+8,20,12);ctx.fillStyle="#7fe7ff";ctx.fillRect(player.x+9,player.y+11,12,5);ctx.restore();ctx.restore()}
+let last=performance.now();function loop(t){const dt=Math.min(.033,(t-last)/1000);last=t;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+function start(){startAudio();buildLevel(0);hp=3;xp=0;score=0;coinCount=0;updateHUD();document.getElementById("hint").style.display="none"}
+document.addEventListener("keydown",e=>{if(["ArrowLeft","ArrowRight","ArrowUp"," ","w","a","d","e","Escape","r"].includes(e.key))e.preventDefault();keys[e.key]=true;if(e.key==="Escape"&&state==="play"){state="pause";show("pause")}else if(e.key==="Escape"&&state==="pause"){state="play";show("pause",false)}else if(e.key==="e")interact();else if(e.key==="r"&&state==="play")resetLevel()});
+document.addEventListener("keyup",e=>keys[e.key]=false);
+function bind(id,k){const el=document.getElementById(id);el.addEventListener("pointerdown",e=>{e.preventDefault();touch[k]=true;if(k==="e")interact()});["pointerup","pointercancel","pointerleave"].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();touch[k]=false}))}
+bind("left","l");bind("right","r");bind("jump","j");bind("act","e");
+play.onclick=start;how.onclick=()=>{show("menu",false);show("help")};back.onclick=()=>{show("help",false);show("menu")};
+resume.onclick=()=>{state="play";show("pause",false)};restart.onclick=resetLevel;pmenu.onclick=()=>{state="menu";show("pause",false);show("menu")};
+retry.onclick=()=>{hp=3;resetLevel()};omenu.onclick=()=>{state="menu";show("over",false);show("menu")};
+again.onclick=()=>{hp=3;xp=0;score=0;coinCount=0;buildLevel(0)};wmenu.onclick=()=>{state="menu";show("win",false);show("menu")};
+sound.onclick=()=>{soundOn=!soundOn;sound.textContent=(soundOn?"🔊 SOUND ON":"🔇 SOUND OFF");startAudio()};
+music.onclick=()=>{musicOn=!musicOn;music.textContent=(musicOn?"🎵 MUSIC ON":"🎵 MUSIC OFF");if(musicOn)startAudio();else stopMusic()};
+addEventListener("orientationchange",()=>{document.getElementById("portrait").style.display=innerHeight>innerWidth?"flex":"none"});if(innerHeight>innerWidth)document.getElementById("portrait").style.display="flex";
+show("menu");updateHUD();
+</script>
+</body>
+</html>
